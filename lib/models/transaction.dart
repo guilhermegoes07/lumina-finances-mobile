@@ -63,10 +63,23 @@ class Transaction {
 class TransactionModel extends ChangeNotifier {
   List<Transaction> _transactions = [];
 
-  List<Transaction> get transactions => _transactions;
+  List<Transaction> get transactions {
+    final sortedTransactions = List<Transaction>.from(_transactions);
+    sortedTransactions.sort((a, b) => b.date.compareTo(a.date)); // Mais recentes primeiro
+    return sortedTransactions;
+  }
 
-  List<Transaction> get incomes => _transactions.where((t) => t.type == 'income').toList();
-  List<Transaction> get expenses => _transactions.where((t) => t.type == 'expense').toList();
+  List<Transaction> get incomes {
+    final incomeTransactions = _transactions.where((t) => t.type == 'income').toList();
+    incomeTransactions.sort((a, b) => b.date.compareTo(a.date)); // Mais recentes primeiro
+    return incomeTransactions;
+  }
+  
+  List<Transaction> get expenses {
+    final expenseTransactions = _transactions.where((t) => t.type == 'expense').toList();
+    expenseTransactions.sort((a, b) => b.date.compareTo(a.date)); // Mais recentes primeiro
+    return expenseTransactions;
+  }
 
   double get balance => incomes.fold(0.0, (sum, item) => sum + item.amount) - 
                        expenses.fold(0.0, (sum, item) => sum + item.amount);
@@ -210,12 +223,15 @@ class TransactionModel extends ChangeNotifier {
     required DateTime endDate,
     String? category,
   }) {
-    return _transactions.where((t) {
+    final filteredTransactions = _transactions.where((t) {
       final isInDateRange = t.date.isAfter(startDate) && 
                            t.date.isBefore(endDate.add(const Duration(days: 1)));
       final matchesCategory = category == null || t.category == category;
       return isInDateRange && matchesCategory;
     }).toList();
+    
+    filteredTransactions.sort((a, b) => b.date.compareTo(a.date)); // Mais recentes primeiro
+    return filteredTransactions;
   }
 
   List<Transaction> getTransactionsByMonth(int year, int month) {

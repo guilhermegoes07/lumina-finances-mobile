@@ -8,6 +8,7 @@ import 'transaction_screen.dart';
 import 'settings_screen.dart';
 import 'financial_goals_screen.dart';
 import 'reports_screen.dart';
+import 'investments_screen.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -211,12 +212,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         'Entradas',
                         _moneyFormat.format(transactionModel.incomes.fold(0.0, (sum, item) => sum + item.amount)),
                         Colors.green,
+                        'income',
                       ),
                       const SizedBox(width: 16),
                       _buildSummaryItem(
                         'Saídas',
                         _moneyFormat.format(transactionModel.expenses.fold(0.0, (sum, item) => sum + item.amount)),
                         Colors.red,
+                        'expense',
                       ),
                     ],
                   ),
@@ -479,6 +482,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.trending_up),
+            label: 'Investimentos',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.add_circle_outline),
             label: 'Adicionar',
           ),
@@ -493,18 +500,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ],
         onTap: (index) {
           if (index == 1) {
+            // Investimentos
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const InvestmentsScreen()),
+            );
+          } else if (index == 2) {
             // Adicionar transação
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const TransactionScreen()),
             );
-          } else if (index == 2) {
+          } else if (index == 3) {
             // Relatórios
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const ReportsScreen()),
             );
-          } else if (index == 3) {
+          } else if (index == 4) {
             // Configurações
             Navigator.push(
               context,
@@ -516,36 +529,74 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildSummaryItem(String title, String value, Color color) {
+  Widget _buildSummaryItem(String title, String value, Color color, String transactionType) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(isDarkMode ? 0.15 : 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                color: isDarkMode ? Colors.white70 : Colors.grey[600],
-              ),
+      child: GestureDetector(
+        onTap: () {
+          // Criar uma transação temporária com o tipo pré-selecionado
+          final tempTransaction = Transaction(
+            title: '',
+            amount: 0.0,
+            date: DateTime.now(),
+            category: '',
+            type: transactionType,
+            isRecurring: false,
+            recurrenceFrequency: 'monthly',
+            description: '',
+          );
+          
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TransactionScreen(transaction: tempTransaction),
             ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? color.withOpacity(0.9) : color,
+          ).then((result) {
+            // Recarregar dados quando retornar da tela de transação
+            if (result == true) {
+              _loadData();
+            }
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(isDarkMode ? 0.15 : 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDarkMode ? Colors.white70 : Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.add_circle_outline,
+                    size: 16,
+                    color: isDarkMode ? color.withOpacity(0.7) : color.withOpacity(0.6),
+                  ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? color.withOpacity(0.9) : color,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

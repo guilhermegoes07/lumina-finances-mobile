@@ -7,6 +7,7 @@ import 'models/app_settings.dart';
 import 'models/user_profile.dart';
 import 'models/transaction.dart';
 import 'models/financial_goal.dart';
+import 'models/investment.dart';
 import 'services/database_service.dart';
 
 void main() async {
@@ -26,6 +27,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => UserProfile()),
         ChangeNotifierProvider(create: (_) => TransactionModel()),
         ChangeNotifierProvider(create: (_) => FinancialGoalModel()),
+        ChangeNotifierProvider(create: (_) => InvestmentModel()),
       ],
       child: const LuminaFinancesApp(),
     ),
