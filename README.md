@@ -12,16 +12,6 @@ Lumina Finances é um aplicativo mobile de código aberto para gerenciamento de 
 
 O projeto busca oferecer uma interface limpa e intuitiva para que o usuário possa organizar suas receitas e despesas de forma eficiente. A ideia é criar uma ferramenta funcional enquanto aprofundo meus conhecimentos em Dart, Flutter e desenvolvimento de aplicações multiplataforma.
 
-## 📱 Telas da Aplicação (Preview)
-
-Abaixo estão algumas das telas principais do aplicativo.
-
-*(Dica: Para adicionar suas imagens, suba os arquivos para uma pasta no seu repositório e substitua os links abaixo)*
-
-| Tela de Login | Tela Inicial (Dashboard) | Adicionar Transação |
-| :-----------: | :----------------------: | :-------------------: |
-| ![Tela de Login](URL_DA_SUA_IMAGEM.png) | ![Tela Inicial](URL_DA_SUA_IMAGEM.png) | ![Adicionar Transação](URL_DA_SUA_IMAGEM.png) |
-
 ## ✨ Funcionalidades
 
 Atualmente, o projeto está em desenvolvimento. As funcionalidades planejadas incluem:
