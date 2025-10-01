@@ -26,8 +26,6 @@ Atualmente, o projeto está em desenvolvimento. As funcionalidades planejadas in
 
 * **Framework**: Flutter
 * **Linguagem**: Dart
-* **Gerência de Estado**: *(Adicionar a biblioteca que você está usando, ex: Provider, BLoC, GetX)*
-* **Banco de Dados Local**: *(Adicionar a solução de persistência, ex: SQLite, Hive)*
 
 ## ⚙️ Como Executar o Projeto
 
