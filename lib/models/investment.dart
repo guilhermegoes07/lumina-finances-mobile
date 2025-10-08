@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'user_investment.dart';
 
 class Investment {
   final int? id;
@@ -118,10 +119,10 @@ class Investment {
 
 class InvestmentModel extends ChangeNotifier {
   List<Investment> _investments = [];
-  List<Investment> _userInvestments = [];
+  List<UserInvestment> _userInvestments = [];
 
   List<Investment> get investments => _investments;
-  List<Investment> get userInvestments => _userInvestments;
+  List<UserInvestment> get userInvestments => _userInvestments;
 
   InvestmentModel() {
     _loadDefaultInvestments();
@@ -288,7 +289,7 @@ class InvestmentModel extends ChangeNotifier {
     }
     final prefs = await SharedPreferences.getInstance();
     final jsonList = prefs.getStringList(key) ?? [];
-    _userInvestments = jsonList.map((json) => Investment.fromMap(jsonDecode(json))).toList();
+    _userInvestments = jsonList.map((json) => UserInvestment.fromMap(jsonDecode(json))).toList();
     notifyListeners();
   }
 
@@ -307,25 +308,21 @@ class InvestmentModel extends ChangeNotifier {
       }
     }
 
-    final investmentWithId = Investment(
+    final userInvestment = UserInvestment(
       id: newId,
-      name: investment.name,
-      description: investment.description,
-      minYield: investment.minYield,
-      maxYield: investment.maxYield,
-      minAmount: investment.minAmount,
-      maxAmount: investment.maxAmount,
+      investmentName: investment.name,
+      amount: amount,
+      dateInvested: DateTime.now(),
+      yieldRate: (investment.minYield + investment.maxYield) / 2,
       category: investment.category,
       type: investment.type,
       risk: investment.risk,
-      liquidity: investment.liquidity,
       institution: investment.institution,
       icon: investment.icon,
       color: investment.color,
-      isActive: true,
     );
 
-    jsonList.add(jsonEncode(investmentWithId.toMap()));
+    jsonList.add(jsonEncode(userInvestment.toMap()));
     await prefs.setStringList(key, jsonList);
     await loadUserInvestments();
   }
@@ -338,5 +335,43 @@ class InvestmentModel extends ChangeNotifier {
     return _investments.where((inv) => 
       inv.minYield >= minYield && inv.maxYield <= maxYield
     ).toList();
+  }
+
+  double getTotalInvested() {
+    return _userInvestments.fold(0.0, (sum, inv) => sum + inv.amount);
+  }
+
+  double getTotalCurrentValue() {
+    return _userInvestments.fold(0.0, (sum, inv) => sum + inv.calculateCurrentValue());
+  }
+
+  double getTotalProfit() {
+    return getTotalCurrentValue() - getTotalInvested();
+  }
+
+  double getTotalProfitPercentage() {
+    final invested = getTotalInvested();
+    if (invested == 0) return 0.0;
+    return (getTotalProfit() / invested) * 100;
+  }
+
+  Map<String, double> getInvestmentsByCategory() {
+    Map<String, double> categoryTotals = {};
+    for (var inv in _userInvestments) {
+      categoryTotals[inv.category] = (categoryTotals[inv.category] ?? 0) + inv.amount;
+    }
+    return categoryTotals;
+  }
+
+  Future<void> removeUserInvestment(int id) async {
+    final key = await _getUserKey();
+    if (key == null) return;
+    
+    _userInvestments.removeWhere((inv) => inv.id == id);
+    
+    final prefs = await SharedPreferences.getInstance();
+    final jsonList = _userInvestments.map((inv) => jsonEncode(inv.toMap())).toList();
+    await prefs.setStringList(key, jsonList);
+    notifyListeners();
   }
 } 

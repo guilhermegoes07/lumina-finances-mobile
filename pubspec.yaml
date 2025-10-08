@@ -46,6 +46,9 @@ dependencies:
   csv: ^5.1.1
   crypto: ^3.0.3
   fl_chart: ^0.60.0
+  pdf: ^3.10.7
+  printing: ^5.11.1
+  local_auth: ^2.1.8
 
 dev_dependencies:
   flutter_test:

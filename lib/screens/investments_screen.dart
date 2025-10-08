@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/investment.dart';
 import '../models/transaction.dart';
+import 'portfolio_screen.dart';
 
 class InvestmentsScreen extends StatefulWidget {
   const InvestmentsScreen({super.key});
@@ -404,9 +405,9 @@ class _InvestmentsScreenState extends State<InvestmentsScreen> {
           IconButton(
             icon: const Icon(Icons.account_balance_wallet),
             onPressed: () {
-              // TODO: Implementar tela de portfólio
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Portfólio em desenvolvimento')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const PortfolioScreen()),
               );
             },
           ),

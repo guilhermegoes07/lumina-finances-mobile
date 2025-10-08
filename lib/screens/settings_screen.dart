@@ -10,8 +10,11 @@ import 'bank_accounts_screen.dart';
 import '../models/transaction.dart';
 import '../models/financial_goal.dart';
 import '../services/auth_service.dart';
+import '../services/pdf_service.dart';
+import '../services/biometric_auth_service.dart';
 import 'welcome_screen.dart';
 import 'dart:convert';
+import 'package:printing/printing.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -535,13 +538,102 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ListTile(
                       leading: const Icon(Icons.picture_as_pdf_outlined),
                       title: const Text('Exportar como PDF'),
-                      onTap: () {
+                      onTap: () async {
                         Navigator.pop(context);
+                        
+                        // Mostrar indicador de progresso
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Exportação em PDF será implementada em breve!'),
+                            content: Text('Gerando PDF...'),
+                            duration: Duration(seconds: 2),
                           ),
                         );
+                        
+                        try {
+                          final transactionModel = Provider.of<TransactionModel>(context, listen: false);
+                          final goalModel = Provider.of<FinancialGoalModel>(context, listen: false);
+                          
+                          // Opção de escolher entre transações ou metas
+                          final result = await showDialog<String>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Escolha o tipo de relatório'),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ListTile(
+                                    leading: const Icon(Icons.receipt_long),
+                                    title: const Text('Transações'),
+                                    onTap: () => Navigator.pop(context, 'transactions'),
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(Icons.flag),
+                                    title: const Text('Metas Financeiras'),
+                                    onTap: () => Navigator.pop(context, 'goals'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                          
+                          if (result == null) return;
+                          
+                          if (result == 'transactions') {
+                            final file = await PdfService.generateTransactionsReport(
+                              transactions: transactionModel.transactions,
+                              balance: transactionModel.balance,
+                              totalIncome: transactionModel.totalIncome,
+                              totalExpenses: transactionModel.totalExpenses,
+                            );
+                            
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('PDF gerado: ${file.path.split('/').last}'),
+                                  action: SnackBarAction(
+                                    label: 'Visualizar',
+                                    onPressed: () async {
+                                      await Printing.sharePdf(
+                                        bytes: await file.readAsBytes(),
+                                        filename: file.path.split('/').last,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              );
+                            }
+                          } else if (result == 'goals') {
+                            final file = await PdfService.generateGoalsReport(
+                              goals: goalModel.goals,
+                            );
+                            
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('PDF gerado: ${file.path.split('/').last}'),
+                                  action: SnackBarAction(
+                                    label: 'Visualizar',
+                                    onPressed: () async {
+                                      await Printing.sharePdf(
+                                        bytes: await file.readAsBytes(),
+                                        filename: file.path.split('/').last,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Erro ao gerar PDF: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
                       },
                     ),
                     const SizedBox(height: 16),
@@ -582,15 +674,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             title: const Text('Autenticação Biométrica'),
                             subtitle: const Text('Usar impressão digital ou Face ID para acessar o app'),
                             value: biometricEnabled,
-                            onChanged: (value) {
-                              setState(() {
-                                biometricEnabled = value;
-                              });
-                              
+                            onChanged: (value) async {
                               if (value) {
+                                // Verificar se o dispositivo suporta biometria
+                                final canCheck = await BiometricAuthService.canCheckBiometrics();
+                                if (!canCheck) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Seu dispositivo não suporta autenticação biométrica'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                
+                                // Tentar autenticar
+                                final authenticated = await BiometricAuthService.authenticate();
+                                if (authenticated) {
+                                  await BiometricAuthService.enableBiometric();
+                                  setState(() {
+                                    biometricEnabled = true;
+                                  });
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Autenticação biométrica ativada com sucesso!'),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Falha na autenticação biométrica'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              } else {
+                                await BiometricAuthService.disableBiometric();
+                                setState(() {
+                                  biometricEnabled = false;
+                                });
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Autenticação biométrica será implementada em breve!'),
+                                    content: Text('Autenticação biométrica desativada'),
                                   ),
                                 );
                               }
@@ -600,18 +726,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             title: const Text('Código PIN'),
                             subtitle: const Text('Usar um código de 4 dígitos para acessar o app'),
                             value: pinEnabled,
-                            onChanged: (value) {
-                              setState(() {
-                                pinEnabled = value;
-                              });
-                              
+                            onChanged: (value) async {
                               if (value) {
                                 Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Configuração de PIN será implementada em breve!'),
-                                  ),
-                                );
+                                // Mostrar diálogo para configurar PIN
+                                final pin = await _showPinDialog(context, 'Configurar PIN', 'Digite um PIN de 4 dígitos');
+                                if (pin != null && pin.length == 4) {
+                                  // Confirmar PIN
+                                  final confirmPin = await _showPinDialog(context, 'Confirmar PIN', 'Digite o PIN novamente');
+                                  if (confirmPin == pin) {
+                                    await PinAuthService.setPin(pin);
+                                    setState(() {
+                                      pinEnabled = true;
+                                    });
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('PIN configurado com sucesso!'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Os PINs não coincidem'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              } else {
+                                Navigator.pop(context);
+                                // Verificar PIN antes de desativar
+                                final pin = await _showPinDialog(context, 'Desativar PIN', 'Digite seu PIN atual');
+                                if (pin != null) {
+                                  final verified = await PinAuthService.verifyPin(pin);
+                                  if (verified) {
+                                    await PinAuthService.removePin();
+                                    setState(() {
+                                      pinEnabled = false;
+                                    });
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('PIN removido com sucesso'),
+                                      ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('PIN incorreto'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
                               }
                             },
                           ),
@@ -690,6 +857,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<String?> _showPinDialog(BuildContext context, String title, String message) async {
+    final TextEditingController pinController = TextEditingController();
+    
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pinController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 4,
+              decoration: const InputDecoration(
+                hintText: '****',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (pinController.text.length == 4) {
+                Navigator.pop(context, pinController.text);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('O PIN deve ter 4 dígitos'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Confirmar'),
           ),
         ],
       ),

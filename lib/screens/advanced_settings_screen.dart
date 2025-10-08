@@ -10,10 +10,12 @@ import 'package:csv/csv.dart';
 import 'spending_limits_screen.dart';
 import 'dart:convert';
 import '../services/auth_service.dart';
+import '../services/pdf_service.dart';
 import 'welcome_screen.dart';
 import 'login_screen.dart';
 import '../models/transaction.dart';
 import '../models/financial_goal.dart';
+import 'package:printing/printing.dart';
 
 class AdvancedSettingsScreen extends StatefulWidget {
   final String? initialTab;
@@ -153,16 +155,43 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
           );
         }
       } else if (format == 'pdf') {
-        // Aqui seria a implementação da exportação em PDF
-        // Para uma implementação real, seria necessário usar pacotes como pdf, printing, etc.
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Exportação em PDF implementada em breve!'),
-              duration: Duration(seconds: 3),
-            ),
+        // Implementação da exportação em PDF
+        try {
+          final transactionModel = Provider.of<TransactionModel>(context, listen: false);
+          
+          final file = await PdfService.generateTransactionsReport(
+            transactions: transactionModel.transactions,
+            balance: transactionModel.balance,
+            totalIncome: transactionModel.totalIncome,
+            totalExpenses: transactionModel.totalExpenses,
           );
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('PDF gerado: ${file.path.split('/').last}'),
+                duration: const Duration(seconds: 4),
+                action: SnackBarAction(
+                  label: 'Visualizar',
+                  onPressed: () async {
+                    await Printing.sharePdf(
+                      bytes: await file.readAsBytes(),
+                      filename: file.path.split('/').last,
+                    );
+                  },
+                ),
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Erro ao gerar PDF: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
       }
     } catch (e) {
