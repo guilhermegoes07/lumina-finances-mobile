@@ -187,6 +187,18 @@ class _TransactionScreenState extends State<TransactionScreen> {
                   if (value == null || value.isEmpty) {
                     return 'Por favor, informe um valor';
                   }
+                  // Validar formato numérico
+                  final cleanValue = value.replaceAll(',', '.');
+                  final numValue = double.tryParse(cleanValue);
+                  if (numValue == null) {
+                    return 'Valor inválido. Use apenas números';
+                  }
+                  if (numValue <= 0) {
+                    return 'O valor deve ser maior que zero';
+                  }
+                  if (numValue > 999999999) {
+                    return 'Valor muito alto';
+                  }
                   return null;
                 },
               ),

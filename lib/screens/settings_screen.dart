@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'spending_limits_screen.dart';
 import 'financial_goals_screen.dart';
 import 'bank_accounts_screen.dart';
+import 'chat_support_screen.dart';
 import '../models/transaction.dart';
 import '../models/financial_goal.dart';
 import '../services/auth_service.dart';
@@ -15,6 +16,7 @@ import '../services/biometric_auth_service.dart';
 import 'welcome_screen.dart';
 import 'dart:convert';
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -361,13 +363,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         leading: const Icon(Icons.email_outlined),
                         title: const Text('Contato por Email'),
                         subtitle: const Text('suporte@luminafinances.com'),
-                        onTap: () {
+                        onTap: () async {
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Função de envio de email será implementada em breve!'),
-                            ),
+                          final Uri emailUri = Uri(
+                            scheme: 'mailto',
+                            path: 'suporte@luminafinances.com',
+                            query: 'subject=Suporte Lumina Finances&body=Olá, preciso de ajuda com:',
                           );
+                          
+                          try {
+                            if (await canLaunchUrl(emailUri)) {
+                              await launchUrl(emailUri);
+                            } else {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Não foi possível abrir o cliente de email. Por favor, envie um email manualmente para suporte@luminafinances.com'),
+                                    duration: Duration(seconds: 5),
+                                  ),
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Erro ao abrir email: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
                         },
                       ),
                       ListTile(
@@ -420,9 +446,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: const Text('Chat com Suporte'),
                         onTap: () {
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Chat com suporte será implementado em breve!'),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ChatSupportScreen(),
                             ),
                           );
                         },
