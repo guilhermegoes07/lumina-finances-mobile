@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/transaction.dart';
+import '../services/export_import_service.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({Key? key}) : super(key: key);
@@ -39,6 +44,330 @@ class _ReportsScreenState extends State<ReportsScreen> {
       _startDate = start;
       _endDate = DateTime(now.year, now.month + 1, 0);
     });
+  }
+
+  Future<void> _exportTransactions() async {
+    try {
+      final transactionModel = Provider.of<TransactionModel>(context, listen: false);
+      final transactions = transactionModel.transactions;
+      
+      if (transactions.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não há transações para exportar'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      // Solicitar permissão de armazenamento no Android
+      if (Platform.isAndroid) {
+        // Verificar versão do Android
+        bool permissionGranted = false;
+        
+        // Tentar permissão de armazenamento padrão primeiro
+        PermissionStatus storageStatus = await Permission.storage.status;
+        
+        if (!storageStatus.isGranted) {
+          storageStatus = await Permission.storage.request();
+        }
+        
+        if (storageStatus.isGranted) {
+          permissionGranted = true;
+        } else if (storageStatus.isPermanentlyDenied) {
+          // Permissão negada permanentemente, mostrar dialog para abrir configurações
+          final shouldOpenSettings = await showDialog<bool>(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('Permissão Necessária'),
+                content: const Text(
+                  'Para exportar o extrato, é necessário permitir o acesso ao armazenamento.\n\n'
+                  'Deseja abrir as configurações do aplicativo?'
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Abrir Configurações'),
+                  ),
+                ],
+              );
+            },
+          );
+          
+          if (shouldOpenSettings == true) {
+            await openAppSettings();
+          }
+          return;
+        } else {
+          // Tentar permissão alternativa para Android 13+
+          PermissionStatus manageStatus = await Permission.manageExternalStorage.status;
+          
+          if (!manageStatus.isGranted) {
+            manageStatus = await Permission.manageExternalStorage.request();
+          }
+          
+          if (manageStatus.isGranted) {
+            permissionGranted = true;
+          }
+        }
+        
+        if (!permissionGranted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Permissão de armazenamento negada. Não é possível exportar o arquivo.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
+          return;
+        }
+      }
+
+      // Mostrar indicador de carregamento
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 16),
+                Text('Exportando extrato...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      final file = await ExportImportService.exportTransactions(
+        transactions: transactions,
+      );
+      
+      final fileName = file.path.split('/').last;
+      final folderName = Platform.isAndroid ? 'Downloads' : 'Documentos';
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '✅ Extrato exportado com sucesso!',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text('Arquivo: $fileName'),
+                Text('Local: Pasta $folderName'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao exportar: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportAndShareTransactions() async {
+    try {
+      final transactionModel = Provider.of<TransactionModel>(context, listen: false);
+      final transactions = transactionModel.transactions;
+      
+      if (transactions.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não há transações para exportar'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      // Mostrar indicador de carregamento
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 16),
+                Text('Preparando extrato...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Exportar para um arquivo temporário (não precisa de permissões)
+      final file = await ExportImportService.exportTransactions(
+        transactions: transactions,
+      );
+      
+      // Compartilhar o arquivo usando o share nativo do sistema
+      final result = await Share.shareXFiles(
+        [XFile(file.path)],
+        subject: 'Extrato Lumina Finances',
+        text: 'Extrato com ${transactions.length} transações exportado do Lumina Finances',
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        
+        if (result.status == ShareResultStatus.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Extrato compartilhado com sucesso!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        } else if (result.status == ShareResultStatus.dismissed) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Compartilhamento cancelado'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao exportar: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _importTransactions() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+
+      if (result != null) {
+        final file = File(result.files.single.path!);
+        
+        // Validar arquivo
+        final isValid = await ExportImportService.validateImportFile(file);
+        if (!isValid) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Arquivo inválido. Selecione um arquivo de extrato válido do Lumina Finances.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        // Obter estatísticas do arquivo
+        final stats = await ExportImportService.getImportStatistics(file);
+        
+        // Mostrar dialog de confirmação
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Confirmar Importação'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Arquivo: ${result.files.single.name}'),
+                  const SizedBox(height: 8),
+                  Text('Total de transações: ${stats['total_transactions']}'),
+                  Text('Entradas: ${stats['income_count']} (${_moneyFormat.format(stats['total_income'])})'),
+                  Text('Saídas: ${stats['expense_count']} (${_moneyFormat.format(stats['total_expense'])})'),
+                  const SizedBox(height: 8),
+                  const Text('Deseja importar essas transações?'),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Importar'),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (confirmed == true) {
+          // Importar transações
+          final importedTransactions = await ExportImportService.importTransactions(file);
+          final transactionModel = Provider.of<TransactionModel>(context, listen: false);
+          
+          for (var transaction in importedTransactions) {
+            await transactionModel.addTransaction(transaction);
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${importedTransactions.length} transações importadas com sucesso!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao importar: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -84,6 +413,73 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ],
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+
+          // Ações de Extrato
+          Card(
+            color: Theme.of(context).cardColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Gerenciar Extrato',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _exportTransactions,
+                          icon: const Icon(Icons.save_alt, size: 20),
+                          label: const Text('Salvar', style: TextStyle(fontSize: 13)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _exportAndShareTransactions,
+                          icon: const Icon(Icons.share, size: 20),
+                          label: const Text('Compartilhar', style: TextStyle(fontSize: 13)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _importTransactions,
+                          icon: const Icon(Icons.file_upload, size: 20),
+                          label: const Text('Importar', style: TextStyle(fontSize: 13)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Salve na pasta Downloads, compartilhe via WhatsApp/Email ou importe de outro dispositivo.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -239,7 +635,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = (constraints.maxHeight < constraints.maxWidth ? constraints.maxHeight : constraints.maxWidth) * 0.6;
-        double start = 0.0;
         return Stack(
           children: [
             Center(
