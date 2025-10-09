@@ -50,6 +50,9 @@ dependencies:
   printing: ^5.11.1
   local_auth: ^2.1.8
   url_launcher: ^6.2.2
+  file_picker: ^6.1.1
+  permission_handler: ^11.0.1
+  share_plus: ^7.2.1
 
 dev_dependencies:
   flutter_test:

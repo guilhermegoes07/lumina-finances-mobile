@@ -84,6 +84,10 @@ class TransactionModel extends ChangeNotifier {
   double get balance => incomes.fold(0.0, (sum, item) => sum + item.amount) - 
                        expenses.fold(0.0, (sum, item) => sum + item.amount);
 
+  double get totalIncome => incomes.fold(0.0, (sum, item) => sum + item.amount);
+
+  double get totalExpenses => expenses.fold(0.0, (sum, item) => sum + item.amount);
+
   TransactionModel() {
     loadTransactions();
   }

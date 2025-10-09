@@ -350,10 +350,11 @@ class PdfService {
                             color: PdfColors.blue700,
                           ),
                         ),
-                        pw.Text(
-                          'Prazo: ${_dateFormat.format(goal.deadline)}',
-                          style: const pw.TextStyle(fontSize: 12),
-                        ),
+                        if (goal.deadline != null)
+                          pw.Text(
+                            'Prazo: ${_dateFormat.format(goal.deadline!)}',
+                            style: const pw.TextStyle(fontSize: 12),
+                          ),
                       ],
                     ),
                     if (goal.description.isNotEmpty) ...[

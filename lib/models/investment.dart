@@ -355,7 +355,7 @@ class InvestmentModel extends ChangeNotifier {
     return (getTotalProfit() / invested) * 100;
   }
 
-  Map<String, double> getInvestmentsByCategory() {
+  Map<String, double> getInvestmentsByCategoryTotals() {
     Map<String, double> categoryTotals = {};
     for (var inv in _userInvestments) {
       categoryTotals[inv.category] = (categoryTotals[inv.category] ?? 0) + inv.amount;

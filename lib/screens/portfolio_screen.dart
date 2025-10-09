@@ -217,7 +217,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   }
 
   Widget _buildCategoryDistribution(InvestmentModel model) {
-    final categoryTotals = model.getInvestmentsByCategory();
+    final categoryTotals = model.getInvestmentsByCategoryTotals();
     final total = model.getTotalInvested();
 
     if (categoryTotals.isEmpty) return const SizedBox.shrink();
