@@ -109,6 +109,16 @@ class DatabaseService {
     await db.insert('categories', category);
   }
 
+  static Future<void> updateCategory(int id, Map<String, dynamic> category) async {
+    final db = await database;
+    await db.update(
+      'categories',
+      category,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   static Future<void> deleteCategory(int id) async {
     final db = await database;
     await db.delete(
