@@ -8,6 +8,9 @@ import 'spending_limits_screen.dart';
 import 'financial_goals_screen.dart';
 import 'bank_accounts_screen.dart';
 import 'chat_support_screen.dart';
+import 'categories_management_screen.dart';
+import 'savings_box_screen.dart';
+import 'forecast_screen.dart';
 import '../models/transaction.dart';
 import '../models/financial_goal.dart';
 import '../services/auth_service.dart';
@@ -292,6 +295,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
             },
           ),
+
+          // Gerenciar Categorias
+          ListTile(
+            leading: const Icon(Icons.category),
+            title: const Text('Gerenciar Categorias'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CategoriesManagementScreen(),
+                ),
+              );
+            },
+          ),
+
+          // Caixinhas de Investimento
+          ListTile(
+            leading: const Icon(Icons.savings),
+            title: const Text('Caixinhas de Investimento'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SavingsBoxScreen(),
+                ),
+              );
+            },
+          ),
+
+          // Previsão Financeira
+          ListTile(
+            leading: const Icon(Icons.trending_up),
+            title: const Text('Previsão Financeira'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ForecastScreen(),
+                ),
+              );
+            },
+          ),
           
           // Configurações Avançadas
           ListTile(
@@ -515,6 +563,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: const Text('Receber alertas de gastos e lembretes'),
             value: _notificationsEnabled,
             onChanged: _toggleNotifications,
+          ),
+
+          // Exibir Previsão de Saldo
+          SwitchListTile(
+            secondary: const Icon(Icons.trending_up),
+            title: const Text('Exibir Previsão de Saldo'),
+            subtitle: const Text('Mostrar saldo previsto com transações pendentes'),
+            value: appSettings.showForecast,
+            onChanged: (value) {
+              appSettings.toggleForecast();
+            },
           ),
           
           // Exportar Dados

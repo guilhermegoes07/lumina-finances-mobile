@@ -18,6 +18,7 @@ class Transaction {
   final bool isRecurring;
   final String recurrenceFrequency; // 'daily', 'weekly', 'monthly', 'yearly'
   final String description;
+  final bool isPending; // Indica se é uma transação futura/pendente
 
   Transaction({
     this.id,
@@ -29,6 +30,7 @@ class Transaction {
     this.isRecurring = false,
     this.recurrenceFrequency = 'monthly',
     this.description = '',
+    this.isPending = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -42,6 +44,7 @@ class Transaction {
       'isRecurring': isRecurring ? 1 : 0,
       'recurrenceFrequency': recurrenceFrequency,
       'description': description,
+      'isPending': isPending ? 1 : 0,
     };
   }
 
@@ -56,6 +59,7 @@ class Transaction {
       isRecurring: map['isRecurring'] == 1,
       recurrenceFrequency: map['recurrenceFrequency'],
       description: map['description'],
+      isPending: map['isPending'] == 1,
     );
   }
 }
@@ -69,14 +73,22 @@ class TransactionModel extends ChangeNotifier {
     return sortedTransactions;
   }
 
+  List<Transaction> get confirmedTransactions {
+    return _transactions.where((t) => !t.isPending).toList();
+  }
+
+  List<Transaction> get pendingTransactions {
+    return _transactions.where((t) => t.isPending).toList();
+  }
+
   List<Transaction> get incomes {
-    final incomeTransactions = _transactions.where((t) => t.type == 'income').toList();
+    final incomeTransactions = confirmedTransactions.where((t) => t.type == 'income').toList();
     incomeTransactions.sort((a, b) => b.date.compareTo(a.date)); // Mais recentes primeiro
     return incomeTransactions;
   }
   
   List<Transaction> get expenses {
-    final expenseTransactions = _transactions.where((t) => t.type == 'expense').toList();
+    final expenseTransactions = confirmedTransactions.where((t) => t.type == 'expense').toList();
     expenseTransactions.sort((a, b) => b.date.compareTo(a.date)); // Mais recentes primeiro
     return expenseTransactions;
   }
@@ -112,7 +124,14 @@ class TransactionModel extends ChangeNotifier {
     bool changed = false;
     int nextId = 1;
     // Descobrir o maior id já usado
-    final List<Transaction> loaded = jsonList.map((json) => Transaction.fromMap(jsonDecode(json))).toList();
+    final List<Transaction> loaded = jsonList.map((json) {
+      final map = jsonDecode(json);
+      // Adicionar isPending se não existir
+      if (!map.containsKey('isPending')) {
+        map['isPending'] = 0;
+      }
+      return Transaction.fromMap(map);
+    }).toList();
     final ids = loaded.where((t) => t.id != null).map((t) => t.id!).toList();
     if (ids.isNotEmpty) {
       nextId = ids.reduce((a, b) => a > b ? a : b) + 1;
@@ -130,6 +149,7 @@ class TransactionModel extends ChangeNotifier {
           isRecurring: t.isRecurring,
           recurrenceFrequency: t.recurrenceFrequency,
           description: t.description,
+          isPending: t.isPending,
         );
         newJsonList.add(jsonEncode(tWithId.toMap()));
         nextId++;
@@ -152,13 +172,26 @@ class TransactionModel extends ChangeNotifier {
     }
     final prefs = await SharedPreferences.getInstance();
     final jsonList = prefs.getStringList(key) ?? [];
-    _transactions = jsonList.map((json) => Transaction.fromMap(jsonDecode(json))).toList();
+    _transactions = jsonList.map((json) {
+      final map = jsonDecode(json);
+      // Adicionar isPending se não existir (para retrocompatibilidade)
+      if (!map.containsKey('isPending')) {
+        map['isPending'] = 0;
+      }
+      return Transaction.fromMap(map);
+    }).toList();
     // MIGRAÇÃO: garantir que todas as transações tenham id
     await migrateTransactionsAddIds();
     // Recarregar se houve migração
     final jsonList2 = prefs.getStringList(key) ?? [];
     if (jsonList2.length != jsonList.length || jsonList2.toString() != jsonList.toString()) {
-      _transactions = jsonList2.map((json) => Transaction.fromMap(jsonDecode(json))).toList();
+      _transactions = jsonList2.map((json) {
+        final map = jsonDecode(json);
+        if (!map.containsKey('isPending')) {
+          map['isPending'] = 0;
+        }
+        return Transaction.fromMap(map);
+      }).toList();
     }
     notifyListeners();
   }
@@ -188,6 +221,7 @@ class TransactionModel extends ChangeNotifier {
             isRecurring: transaction.isRecurring,
             recurrenceFrequency: transaction.recurrenceFrequency,
             description: transaction.description,
+            isPending: transaction.isPending,
           )
         : transaction;
 
@@ -266,5 +300,59 @@ class TransactionModel extends ChangeNotifier {
     }
     
     return result;
+  }
+
+  // Métodos para previsão de saldo
+  double getPredictedBalanceForMonth(int year, int month) {
+    final currentBalance = balance;
+    final now = DateTime.now();
+    final targetDate = DateTime(year, month + 1, 0); // Último dia do mês
+    
+    // Se for um mês passado, retorna o saldo atual
+    if (targetDate.isBefore(now)) {
+      return currentBalance;
+    }
+    
+    // Calcula transações pendentes até o fim do mês
+    final pendingInMonth = pendingTransactions.where((t) {
+      return t.date.year == year && t.date.month == month;
+    }).toList();
+    
+    double predictedChange = 0.0;
+    for (var t in pendingInMonth) {
+      if (t.type == 'income') {
+        predictedChange += t.amount;
+      } else {
+        predictedChange -= t.amount;
+      }
+    }
+    
+    return currentBalance + predictedChange;
+  }
+
+  Map<String, dynamic> getMonthForecast(int year, int month) {
+    final confirmedIncome = confirmedTransactions
+        .where((t) => t.type == 'income' && t.date.year == year && t.date.month == month)
+        .fold(0.0, (sum, t) => sum + t.amount);
+    
+    final confirmedExpense = confirmedTransactions
+        .where((t) => t.type == 'expense' && t.date.year == year && t.date.month == month)
+        .fold(0.0, (sum, t) => sum + t.amount);
+    
+    final pendingIncome = pendingTransactions
+        .where((t) => t.type == 'income' && t.date.year == year && t.date.month == month)
+        .fold(0.0, (sum, t) => sum + t.amount);
+    
+    final pendingExpense = pendingTransactions
+        .where((t) => t.type == 'expense' && t.date.year == year && t.date.month == month)
+        .fold(0.0, (sum, t) => sum + t.amount);
+    
+    return {
+      'confirmedIncome': confirmedIncome,
+      'confirmedExpense': confirmedExpense,
+      'pendingIncome': pendingIncome,
+      'pendingExpense': pendingExpense,
+      'predictedBalance': getPredictedBalanceForMonth(year, month),
+    };
   }
 } 

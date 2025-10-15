@@ -8,6 +8,7 @@ import 'models/user_profile.dart';
 import 'models/transaction.dart';
 import 'models/financial_goal.dart';
 import 'models/investment.dart';
+import 'models/savings_box.dart';
 import 'services/database_service.dart';
 
 void main() async {
@@ -19,15 +20,17 @@ void main() async {
   // Carregar configurações
   final prefs = await SharedPreferences.getInstance();
   final isDarkMode = prefs.getBool('isDarkMode') ?? false;
+  final showForecast = prefs.getBool('showForecast') ?? false;
   
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AppSettings(isDarkMode: isDarkMode)),
+        ChangeNotifierProvider(create: (_) => AppSettings(isDarkMode: isDarkMode, showForecast: showForecast)),
         ChangeNotifierProvider(create: (_) => UserProfile()),
         ChangeNotifierProvider(create: (_) => TransactionModel()),
         ChangeNotifierProvider(create: (_) => FinancialGoalModel()),
         ChangeNotifierProvider(create: (_) => InvestmentModel()),
+        ChangeNotifierProvider(create: (_) => SavingsBoxModel()),
       ],
       child: const LuminaFinancesApp(),
     ),

@@ -4,11 +4,13 @@ import 'package:intl/intl.dart';
 import '../models/transaction.dart';
 import '../models/user_profile.dart';
 import '../models/financial_goal.dart';
+import '../models/app_settings.dart';
 import 'transaction_screen.dart';
 import 'settings_screen.dart';
 import 'financial_goals_screen.dart';
 import 'reports_screen.dart';
 import 'investments_screen.dart';
+import 'forecast_screen.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -89,6 +91,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final transactionModel = Provider.of<TransactionModel>(context);
     final userProfile = Provider.of<UserProfile>(context);
     final goalModel = Provider.of<FinancialGoalModel>(context);
+    final appSettings = Provider.of<AppSettings>(context);
     
     // Visão mensal dinâmica
     final monthlySummary = _getMonthlySummary(transactionModel.transactions);
@@ -96,6 +99,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final variacao = (monthlySummary.length > 1 && monthlySummary[1]['value'] != 0)
         ? ((monthlySummary.first['value'] - monthlySummary[1]['value']) / monthlySummary[1]['value']) * 100
         : 0.0;
+
+    // Calcular saldo previsto se a opção estiver ativa
+    final now = DateTime.now();
+    final predictedBalance = appSettings.showForecast 
+        ? transactionModel.getPredictedBalanceForMonth(now.year, now.month)
+        : transactionModel.balance;
 
     return Scaffold(
       appBar: AppBar(
@@ -188,23 +197,74 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Saldo Atual',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white70
-                          : Colors.grey[600],
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        appSettings.showForecast ? 'Saldo Previsto' : 'Saldo Atual',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white70
+                              : Colors.grey[600],
+                        ),
+                      ),
+                      if (appSettings.showForecast)
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const ForecastScreen()),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.trending_up,
+                                  size: 14,
+                                  color: Colors.amber[800],
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Ver Previsão',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.amber[800],
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _moneyFormat.format(transactionModel.balance),
-                    style: const TextStyle(
+                    _moneyFormat.format(predictedBalance),
+                    style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
+                      color: appSettings.showForecast ? Colors.amber[700] : null,
                     ),
                   ),
+                  if (appSettings.showForecast && transactionModel.pendingTransactions.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '${transactionModel.pendingTransactions.length} transações pendentes',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.amber[700],
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 16),
                   Row(
                     children: [

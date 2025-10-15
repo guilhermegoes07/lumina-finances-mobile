@@ -23,6 +23,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
   String _transactionType = 'expense'; // 'income' ou 'expense'
   bool _isRecurring = false;
   String _recurrenceFrequency = 'monthly';
+  bool _isPending = false; // Nova flag para transações pendentes
   bool _isLoading = false;
   
   List<String> _expenseCategories = [];
@@ -42,6 +43,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
       _transactionType = widget.transaction!.type;
       _isRecurring = widget.transaction!.isRecurring;
       _recurrenceFrequency = widget.transaction!.recurrenceFrequency;
+      _isPending = widget.transaction!.isPending;
     }
   }
 
@@ -97,6 +99,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
         isRecurring: _isRecurring,
         recurrenceFrequency: _recurrenceFrequency,
         description: _descriptionController.text,
+        isPending: _isPending,
       );
       
       if (widget.transaction != null) {
@@ -400,6 +403,64 @@ class _TransactionScreenState extends State<TransactionScreen> {
                     ),
                     onPressed: () {
                       // Mostrar informações sobre transações recorrentes
+                    },
+                  ),
+                ],
+              ),
+
+              // Transação pendente
+              Row(
+                children: [
+                  Theme(
+                    data: Theme.of(context).copyWith(
+                      checkboxTheme: CheckboxThemeData(
+                        fillColor: MaterialStateProperty.resolveWith<Color>((states) {
+                          if (states.contains(MaterialState.selected)) {
+                            return Colors.amber;
+                          }
+                          return isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
+                        }),
+                        checkColor: MaterialStateProperty.all(Colors.white),
+                      ),
+                    ),
+                    child: Checkbox(
+                      value: _isPending,
+                      onChanged: (value) {
+                        setState(() {
+                          _isPending = value!;
+                        });
+                      },
+                    ),
+                  ),
+                  Text(
+                    'Transação pendente (futura)',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: isDarkMode ? Colors.white70 : Colors.black54,
+                    ),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Transação Pendente'),
+                          content: const Text(
+                            'Marque esta opção para transações futuras que ainda não foram efetivadas. '
+                            'Elas serão consideradas na previsão de saldo.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('OK'),
+                            ),
+                          ],
+                        ),
+                      );
                     },
                   ),
                 ],
